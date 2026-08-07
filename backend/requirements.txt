@@ -3,6 +3,7 @@ uvicorn[standard]
 pydantic
 pydantic-settings
 sqlalchemy
+greenlet
 asyncpg
 alembic
 redis
@@ -21,3 +22,4 @@ passlib[bcrypt]
 pytest
 pytest-asyncio
 httpx
+aiosqlite
