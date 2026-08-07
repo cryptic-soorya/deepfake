@@ -1,15 +1,33 @@
 import { useCallback, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import CornerFrame from "../components/hud/CornerFrame";
+import { createScan } from "../lib/api";
 
 export default function Scanner() {
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   const handleFiles = useCallback((files: FileList | null) => {
     if (files && files[0]) setFile(files[0]);
   }, []);
+
+  const handleSubmit = useCallback(async () => {
+    if (!file || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const { scan_id } = await createScan(file);
+      navigate(`/report/${scan_id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "upload failed");
+      setSubmitting(false);
+    }
+  }, [file, submitting, navigate]);
 
   return (
     <div className="mx-auto max-w-4xl px-6 pb-24 pt-32">
@@ -87,13 +105,14 @@ export default function Scanner() {
 
         <div className="mt-6 flex items-center justify-between">
           <p className="font-mono text-xs text-bone/30">
-            Analysis runs against the full detection stack — see the model table in the docs.
+            {error ?? "Analysis runs against the full detection stack — see the model table in the docs."}
           </p>
           <button
-            disabled={!file}
+            disabled={!file || submitting}
+            onClick={handleSubmit}
             className="border border-amber bg-amber/10 px-6 py-2.5 font-mono text-xs uppercase tracking-widest text-amber transition-colors hover:bg-amber hover:text-void disabled:cursor-not-allowed disabled:border-line-bright disabled:bg-transparent disabled:text-bone/20"
           >
-            Submit Scan &rarr;
+            {submitting ? "Uploading…" : "Submit Scan →"}
           </button>
         </div>
       </motion.div>

@@ -30,7 +30,7 @@ See `PLAN.md` in this folder for the phased build order and current round target
 | Audio deepfake / voice-clone detector | AASIST + wav2vec2-XLSR-53 front end |
 | Lip-sync consistency | SyncNet (pretrained inference only, not trained from scratch) |
 | Visual explainability | Grad-CAM / Grad-CAM++ |
-| Narrative explanation | Claude API (Sonnet) |
+| Narrative explanation | **Gemini 3.1 Flash-Lite** (was Claude API/Sonnet — deliberate team-requested swap 2026-08-08, see PROGRESS.md; cost/latency tradeoff for a narrative task that doesn't need Sonnet-level reasoning) |
 | Fusion | Small MLP/logistic-regression stacking head + temperature scaling |
 
 Do not substitute a lighter/older model (e.g. MesoNet, plain MTCNN) to save setup time without flagging it — every substitution should be a visible, deliberate tradeoff, not a silent downgrade, because this stack was chosen specifically to be defensible against a technically literate judge.

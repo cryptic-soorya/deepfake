@@ -94,11 +94,11 @@ Backend: **FastAPI** (async-native, needed for WebSocket streaming — pick this
 Goal: one coherent demo path, even if narrow, using real models from the stack above (not placeholders).
 - [x] Stand up FastAPI backend with `/api/v1/scan` (batch upload) end to end — upload → MinIO → Postgres `Scan` row → audit log → Redis Streams → worker consumer group → fusion aggregation is wired and tested (`backend/tests/test_scan.py`). Per-model outputs are still placeholders (see below) until the actual detectors are integrated, so worker output is honestly marked `blocked_on_model_integration` rather than faked. See `PROGRESS.md`.
 - [x] Integrate SCRFD face detection — `app/models/face_detector.py` loads real InsightFace weights (`buffalo_l` pack, `detection` module only) and runs genuine ONNX inference; verified in `backend/tests/test_face_detector.py`. See `PROGRESS.md`.
-- [ ] Integrate EfficientNet-B4 (SBI-trained) frame classifier + Grad-CAM heatmap.
+- [x] Integrate EfficientNet-B4 (SBI-trained) frame classifier + Grad-CAM heatmap — `app/models/frame_classifier.py` (real checkpoint, prior session) and `app/models/gradcam.py` (real forward+backward Grad-CAM over `_conv_head`, this session) both verified against real inference in `backend/tests/test_frame_classifier.py` / `test_gradcam.py`. Frame classifier worker now also emits a `gradcam` ScanResult per scan, heatmap PNG uploaded to object storage (not Postgres). See `PROGRESS.md`.
 - [ ] Integrate AASIST + XLSR audio classifier on extracted audio track.
 - [ ] Integrate SyncNet lip-sync scorer as a third modality — this is your differentiator, do not skip it.
 - [ ] Build the fusion head (even a simple logistic regression trained on a small labeled set beats a fixed weighted average).
-- [ ] Wire the Claude explanation endpoint to narrate all three modalities.
+- [x] Wire the narrative-explanation endpoint — **deliberately swapped to Gemini 3.1 Flash-Lite instead of Claude API** per explicit team request (see CLAUDE.md model-stack table + PROGRESS.md for the flagged substitution). `app/models/gemini_explainer.py` calls the real `google-genai` SDK; `app/routers/explain.py` degrades to `501 blocked_on_model_integration` if `GEMINI_API_KEY` is unset or rejected, rather than crashing or faking a narrative. Prompt-building/response-shaping covered by `backend/tests/test_gemini_explainer.py` (mocked client — no live key in this environment).
 - [ ] Frontend: upload flow + score display + heatmap + explanation (extend existing dashboard pattern).
 - [ ] Record a benchmark run: AUROC/EER on a held-out slice of FF++/DFDC + ASVspoof, published as numbers, not adjectives.
 

@@ -21,7 +21,7 @@ efficientnet-pytorch
 gdown
 librosa
 soundfile
-anthropic
+google-genai
 python-jose[cryptography]
 passlib[bcrypt]
 pytest

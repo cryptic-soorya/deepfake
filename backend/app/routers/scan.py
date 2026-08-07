@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,7 +8,7 @@ from app.audit import write_audit_log
 from app.db import get_db
 from app.db_models import Scan, ScanResult, ScanStatus
 from app.queue import enqueue
-from app.storage import upload_media
+from app.storage import download_media, upload_media
 
 router = APIRouter()
 
@@ -75,3 +75,17 @@ async def get_scan(scan_id: str, db: AsyncSession = Depends(get_db)):
             for r in results
         ],
     }
+
+
+@router.get("/{scan_id}/heatmap")
+async def get_scan_heatmap(scan_id: str, db: AsyncSession = Depends(get_db)):
+    """Return the Grad-CAM heatmap PNG for a scan, proxied from object storage."""
+    result = await db.execute(
+        select(ScanResult).where(ScanResult.scan_id == scan_id, ScanResult.model_name == "gradcam")
+    )
+    gradcam_result = result.scalars().first()
+    heatmap_key = (gradcam_result.result_metadata or {}).get("heatmap_key") if gradcam_result else None
+    if heatmap_key is None:
+        raise HTTPException(status_code=404, detail="heatmap not available for this scan")
+
+    return Response(content=download_media(heatmap_key), media_type="image/png")

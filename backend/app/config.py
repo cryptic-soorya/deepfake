@@ -10,7 +10,7 @@ class Settings:
         self.s3_access_key = os.environ["S3_ACCESS_KEY"]
         self.s3_secret_key = os.environ["S3_SECRET_KEY"]
         self.s3_bucket = os.environ["S3_BUCKET"]
-        self.anthropic_api_key = os.environ["ANTHROPIC_API_KEY"]
+        self.gemini_api_key = os.environ["GEMINI_API_KEY"]
         self.jwt_secret = os.environ["JWT_SECRET"]
 
 

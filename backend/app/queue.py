@@ -13,7 +13,11 @@ from app.config import get_settings
 
 @lru_cache
 def get_redis() -> redis.Redis:
-    return redis.from_url(get_settings().redis_url, decode_responses=True)
+    # socket_timeout must exceed StreamConsumer.block_ms (5000ms) -- redis-py's
+    # default socket_timeout is also 5s, which races the server's blocking
+    # XREADGROUP read and intermittently raises a client-side TimeoutError on
+    # an otherwise-idle stream (crashes the worker with no real error).
+    return redis.from_url(get_settings().redis_url, decode_responses=True, socket_timeout=15)
 
 
 def _encode(value: object) -> str | int | float:

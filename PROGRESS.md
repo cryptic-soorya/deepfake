@@ -8,6 +8,82 @@ per CLAUDE.md, no silent placeholders pretending to be real results.
 
 ---
 
+## 2026-08-08 — Grad-CAM heatmap + narrative explainer (Gemini, not Claude)
+
+**Who:** cryptic-soorya (via Claude Code)
+**Round:** 2 (Prototype)
+
+- `backend/app/models/gradcam.py`: `GradCAMExplainer` was `NotImplementedError`; now
+  reuses `EfficientNetB4SBI`'s loaded checkpoint and `_conv_head` (the last conv layer
+  before pooling) as the Grad-CAM target. Runs a real forward pass + backward pass on the
+  P(fake) logit, weights the target layer's activations by pooled gradients, ReLUs and
+  normalizes into a CAM, resizes to the 380x380 crop, and overlays it (JET colormap) on
+  the face crop as a base64 PNG. Deliberately shares the classifier's own face crop
+  instead of loading a second copy of the network, so the heatmap and the score it
+  explains are computed from the same input.
+- `backend/workers/frame_classifier_worker.py`: `_aggregate_frame_predictions` now also
+  returns the winning frame's raw image (`_best_frame_image`, popped off before the
+  aggregate dict is persisted — ScanResult.raw is a JSON column, can't hold an ndarray).
+  `FrameClassifierWorker.handle` runs Grad-CAM on that frame (or the raw bytes, for
+  single-image scans) after the classifier call, uploads the heatmap PNG to object
+  storage as `gradcam/{scan_id}.png` (per CLAUDE.md: no binary media in Postgres), and
+  persists a second `ScanResult` row (`model_name="gradcam"`) holding the score/CAM
+  array/heatmap *key*, not the PNG bytes. Missing checkpoint or no-face-detected cases
+  degrade the same way the classifier itself does (`blocked`/`no face detected`), not a
+  crash.
+- **Narrative explainer — deliberate model substitution, flagged per CLAUDE.md:** team
+  explicitly asked to use **Gemini 3.1 Flash-Lite** instead of the Claude API (Sonnet)
+  CLAUDE.md's model-stack table specifies for this slot. This is not a silent downgrade —
+  CLAUDE.md's table has been updated to record the swap and the reason (cost/latency for
+  a narrative task that doesn't need Sonnet-level reasoning), and it's called out here.
+  `backend/app/models/claude_explainer.py` deleted; replaced by
+  `backend/app/models/gemini_explainer.py` (`GeminiExplainer`), using the `google-genai`
+  SDK. Reads `GEMINI_API_KEY` (required) and `GEMINI_MODEL` (optional, defaults to
+  `gemini-3.1-flash-lite`) from the environment. `_build_prompt` turns the fused verdict +
+  per-modality scores/metadata into a plain-English prompt; `predict()` returns the
+  narrative in `metadata.narrative`.
+- `backend/app/routers/explain.py`: now imports `GeminiExplainer`; the except clause
+  broadened from just `NotImplementedError` to also catch `KeyError` (API key not set)
+  and `google.genai.errors.APIError` (key set but rejected — e.g. the `.env.example`
+  placeholder value — or a Gemini-side failure), all mapping to the existing
+  `blocked_on_model_integration` / `501` path rather than a 500 crash.
+- `backend/app/config.py`, `.env.example`, `backend/tests/conftest.py`: `ANTHROPIC_API_KEY`
+  → `GEMINI_API_KEY` (+ new optional `GEMINI_MODEL`) throughout.
+- `backend/requirements.txt`: `anthropic` → `google-genai`.
+- `backend/tests/test_gradcam.py`: integration test against the real SBI checkpoint
+  (module-scoped fixture, skips offline) — asserts a well-formed score/confidence and a
+  decodable 380x380 PNG heatmap on a real photo, and the no-face path on a blank image.
+- `backend/tests/test_gemini_explainer.py`: unit tests with a mocked `genai.Client` (no
+  live `GEMINI_API_KEY` in this environment) — prompt content, response shaping, and the
+  missing-key `KeyError` path.
+- Verified locally: `pytest -q` → 55 passed (was 50), including the Grad-CAM test
+  actually downloading and running the real EfficientNet-B4/SBI checkpoint (not skipped).
+- **Update, same day:** team dropped two live Gemini keys into `.env`. Added key-fallback
+  to `GeminiExplainer`: `load()` builds a client per configured key (`GEMINI_API_KEY`
+  required, `GEMINI_API_KEY_2` optional), `predict()` tries each in order and returns on
+  first success, re-raising the last error (still an `APIError`, so `explain.py`'s
+  handling is unchanged) only if every key fails. `metadata.key_used` records which key
+  answered (`"primary"`/`"fallback"`) so an operator can tell from a scan's stored
+  explanation whether the primary key was degraded at request time. Reason: two keys so a
+  single key's rate limit doesn't stall scans mid-demo.
+  `backend/tests/test_gemini_explainer.py` covers primary-success, fallback-on-error, and
+  both-keys-fail (mocked). **Then verified live**, not just mocked: ran
+  `GeminiExplainer.predict()` against the real primary key (real narrative came back,
+  good quality, confirms `gemini-3.1-flash-lite` is in fact a real, callable model id) and
+  again with the primary key swapped for an invalid one to force a genuine `APIError` and
+  confirm the real secondary key answers (`key_used: fallback`). Both ad hoc, not part of
+  the committed test suite (no real keys in CI) — pytest suite is still mock-only by
+  design. `pytest -q` → 57 passed (was 55).
+- **Status:** real, verified for Grad-CAM (genuine forward+backward pass, tested against
+  real weights) and now for the Gemini explainer + fallback too — both the primary and
+  fallback paths were exercised against live Gemini keys, not just mocked in the test
+  suite.
+- **Not done yet:** AASIST/XLSR audio classifier and SyncNet lip-sync wrappers exist with
+  real code (per earlier sessions) but weren't touched or re-verified here. The fusion
+  head is still the interim equal-weighted average — Grad-CAM and the explainer don't feed
+  into fusion, they're presentation/explainability layers. Temporal classifier and UnivFD
+  are still stub.
+
 ## 2026-08-08 — Video frame sampling + interim fusion head
 
 **Who:** cryptic-soorya (via Claude Code)
