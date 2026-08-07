@@ -1,0 +1,33 @@
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Models / large artifacts
+*.pt
+*.pth
+*.onnx
+*.ckpt
+backend/app/models/weights/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Docker volumes / local data
+infra/minio_data/
+infra/postgres_data/

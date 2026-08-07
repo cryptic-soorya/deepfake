@@ -1,0 +1,9 @@
+[project]
+name = "morpheus-ai-backend"
+version = "0.1.0"
+description = "Morpheus.AI backend — deepfake detection + identity verification API"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
