@@ -8,12 +8,13 @@ import logging
 from workers.audio_worker import AudioWorker
 from workers.frame_classifier_worker import FrameClassifierWorker
 from workers.fusion_worker import FusionWorker
+from workers.lipsync_worker import LipsyncWorker
 
 logging.basicConfig(level=logging.INFO)
 
 
 async def main() -> None:
-    workers = [FrameClassifierWorker(), AudioWorker(), FusionWorker()]
+    workers = [FrameClassifierWorker(), AudioWorker(), LipsyncWorker(), FusionWorker()]
     await asyncio.gather(*(worker.run() for worker in workers))
 
 

@@ -1,6 +1,3 @@
-import tempfile
-from pathlib import Path
-
 from app.audit import write_audit_log
 from app.db import get_session_maker
 from app.db_models import ScanResult
@@ -10,10 +7,66 @@ from app.queue import enqueue
 from app.storage import download_media
 from workers.base_consumer import StreamConsumer
 
-SAMPLE_FPS = 2.0
-# Bounds per-scan compute on a laptop-class inference worker; revisit once
-# the GRU/temporal-attention head (PLAN.md) makes per-frame cost matter less.
-MAX_FRAMES_PER_SCAN = 30
+# Target sampling rate for video scans and the hard cap on frames scored per
+# scan -- bounds per-scan inference cost. See app/pipeline/frame_sampler.py
+# for why this is fixed-rate rather than scene-change/face-track-aware.
+VIDEO_SAMPLE_FPS = 2.0
+VIDEO_MAX_FRAMES = 32
+
+
+def _aggregate_frame_predictions(model, frames: list[dict]) -> dict:
+    """Run the classifier on each sampled frame and fold per-frame results into
+    the single {score, confidence, raw, metadata} contract the fusion layer
+    expects (one ScanResult row per model per scan, not one per frame).
+
+    Aggregation is max-over-frames on P(fake): a single convincingly faked
+    frame is evidence of manipulation even if most frames look clean, so
+    averaging would dilute exactly the signal we want to catch. Frames where
+    no face was found are excluded from aggregation but kept in `raw` for
+    the forensic report / Grad-CAM step to reference later.
+    """
+    per_frame = []
+    scored = []
+    for sampled in frames:
+        output = model.predict(sampled["frame"])
+        per_frame.append(
+            {
+                "index": sampled["index"],
+                "timestamp_sec": sampled["timestamp_sec"],
+                "score": output.get("score"),
+                "confidence": output.get("confidence"),
+                "metadata": output.get("metadata"),
+            }
+        )
+        if output.get("score") is not None:
+            scored.append(output)
+
+    if not scored:
+        return {
+            "score": None,
+            "confidence": None,
+            "raw": {"frames": per_frame},
+            "metadata": {
+                "status": "no_face_in_any_sampled_frame",
+                "num_frames_sampled": len(frames),
+            },
+        }
+
+    best = max(scored, key=lambda o: o["score"])
+    mean_score = sum(o["score"] for o in scored) / len(scored)
+
+    return {
+        "score": best["score"],
+        "confidence": best["confidence"],
+        "raw": {"frames": per_frame, "best_frame_raw": best["raw"]},
+        "metadata": {
+            "aggregation": "max_over_sampled_frames",
+            "num_frames_sampled": len(frames),
+            "num_frames_with_face": len(scored),
+            "mean_score": mean_score,
+            "interpretation": "score is P(fake) of the most-suspicious sampled frame; high score indicates a deepfake",
+        },
+    }
 
 
 class FrameClassifierWorker(StreamConsumer):
@@ -40,7 +93,16 @@ class FrameClassifierWorker(StreamConsumer):
         try:
             media_bytes = download_media(media_key)
             if media_type == "video":
-                output = self._predict_video(media_bytes, media_key)
+                frames = sample_frames(media_bytes, fps=VIDEO_SAMPLE_FPS, max_frames=VIDEO_MAX_FRAMES)
+                if not frames:
+                    output = {
+                        "score": None,
+                        "confidence": None,
+                        "raw": None,
+                        "metadata": {"status": "no_frames_decoded_from_video"},
+                    }
+                else:
+                    output = _aggregate_frame_predictions(self.model, frames)
             else:
                 output = self.model.predict(media_bytes)
             status = "ok"
@@ -74,52 +136,3 @@ class FrameClassifierWorker(StreamConsumer):
             await session.commit()
 
         await enqueue("scan.model_outputs", {"scan_id": scan_id, "model_name": self.model_name, "status": status})
-
-    def _predict_video(self, media_bytes: bytes, media_key: str) -> dict:
-        """Runs the (frame-level, not temporal) classifier over frames sampled
-        at SAMPLE_FPS and averages the per-frame fake-probability/confidence.
-
-        This is an interim aggregation until the GRU/temporal-attention head
-        (PLAN.md) lands — a mean score misses motion artifacts (unnatural
-        blinking, frame-blend jitter) that a temporal model would catch.
-        """
-        suffix = Path(media_key).suffix or ".mp4"
-        with tempfile.NamedTemporaryFile(suffix=suffix) as tmp:
-            tmp.write(media_bytes)
-            tmp.flush()
-
-            scores: list[float] = []
-            confidences: list[float] = []
-            frames_with_no_face = 0
-            for i, frame in enumerate(sample_frames(tmp.name, fps=SAMPLE_FPS)):
-                if i >= MAX_FRAMES_PER_SCAN:
-                    break
-                result = self.model.predict(frame)
-                if result["score"] is None:
-                    frames_with_no_face += 1
-                    continue
-                scores.append(result["score"])
-                confidences.append(result["confidence"])
-
-        if not scores:
-            return {
-                "score": None,
-                "confidence": None,
-                "raw": None,
-                "metadata": {
-                    "error": "no face detected in any sampled frame",
-                    "frames_with_no_face": frames_with_no_face,
-                },
-            }
-
-        return {
-            "score": sum(scores) / len(scores),
-            "confidence": sum(confidences) / len(confidences),
-            "raw": {"per_frame_scores": scores},
-            "metadata": {
-                "num_frames_scored": len(scores),
-                "frames_with_no_face": frames_with_no_face,
-                "aggregation": "mean_frame_score_interim_pending_temporal_head",
-                "interpretation": "score is mean P(fake) across sampled frames; high score indicates a deepfake video",
-            },
-        }

@@ -42,6 +42,7 @@ async def create_scan(file: UploadFile = File(...), db: AsyncSession = Depends(g
     await enqueue("scan.frames", {"scan_id": scan_id, "media_key": media_key, "media_type": media_type})
     if media_type == "video":
         await enqueue("scan.audio", {"scan_id": scan_id, "media_key": media_key, "media_type": media_type})
+        await enqueue("scan.lipsync", {"scan_id": scan_id, "media_key": media_key, "media_type": media_type})
 
     return {"scan_id": scan_id, "status": ScanStatus.PENDING.value}
 
