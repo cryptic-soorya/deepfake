@@ -1,3 +1,56 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --grid-size: 42px;
+  --grid-color: rgba(232, 230, 225, 0.05);
+}
+
+@layer base {
+  html {
+    background-color: #050506;
+    scroll-behavior: auto;
+  }
+
+  body {
+    @apply bg-void text-bone font-display antialiased;
+    font-feature-settings: "ss01" 1;
+  }
+
+  ::selection {
+    background: #ffb020;
+    color: #050506;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  .font-mono {
+    font-family: "JetBrains Mono", monospace;
+  }
+
+  .bg-grid {
+    background-image:
+      linear-gradient(var(--grid-color) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+    background-size: var(--grid-size) var(--grid-size);
+  }
+
+  .bg-noise {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/></svg>");
+  }
+
+  .text-glow-amber {
+    text-shadow: 0 0 24px rgba(255, 176, 32, 0.35);
+  }
+
+  .clip-corner {
+    clip-path: polygon(0 12px, 12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%);
+  }
+}
