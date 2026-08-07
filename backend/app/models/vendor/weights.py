@@ -20,3 +20,20 @@ def fetch(url: str, filename: str | None = None) -> Path:
         urllib.request.urlretrieve(url, tmp)
         tmp.rename(dest)
     return dest
+
+
+def fetch_gdrive(file_id: str, filename: str) -> Path:
+    """Download a Google Drive share-link file into the same weights cache.
+
+    Google Drive share links need gdown (it handles the interstitial "can't
+    scan this file for viruses" confirmation-token page that larger files
+    trigger) rather than a plain urllib GET like `fetch()` above uses for
+    raw-githubusercontent URLs.
+    """
+    import gdown
+
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    dest = CACHE_DIR / filename
+    if not dest.exists():
+        gdown.download(id=file_id, output=str(dest), quiet=False)
+    return dest

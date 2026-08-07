@@ -17,6 +17,10 @@ opencv-python-headless
 mediapipe
 insightface
 python_speech_features
+efficientnet-pytorch
+gdown
+librosa
+soundfile
 anthropic
 python-jose[cryptography]
 passlib[bcrypt]
