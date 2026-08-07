@@ -12,6 +12,19 @@ services:
     volumes:
       - ../backend:/app
 
+  workers:
+    build: ../backend
+    command: python -m workers.main
+    env_file:
+      - ../.env
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    volumes:
+      - ../backend:/app
+    restart: unless-stopped
+
   frontend:
     image: node:20-slim
     working_dir: /app
