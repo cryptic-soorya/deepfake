@@ -7,9 +7,9 @@ from app.fusion.scoring import fuse
 from workers.base_consumer import StreamConsumer
 
 # Which per-modality detectors must report in before a scan can be fused,
-# keyed by media type. Lip-sync joins this set once SyncNet is wired in.
+# keyed by media type.
 EXPECTED_MODELS = {
-    "video": {"frame_classifier", "audio_deepfake"},
+    "video": {"frame_classifier", "audio_deepfake", "lipsync"},
     "image": {"frame_classifier"},
 }
 

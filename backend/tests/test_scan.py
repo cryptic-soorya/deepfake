@@ -57,7 +57,7 @@ async def test_create_scan_uploads_and_enqueues(client):
     assert body["scan_id"]
 
     stream_names = {stream for stream, _ in client.enqueued}
-    assert stream_names == {"scan.frames", "scan.audio"}
+    assert stream_names == {"scan.frames", "scan.audio", "scan.lipsync"}
 
 
 async def test_create_scan_image_only_enqueues_frames(client):
