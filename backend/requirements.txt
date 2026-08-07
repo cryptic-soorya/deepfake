@@ -16,6 +16,7 @@ onnxruntime
 opencv-python-headless
 mediapipe
 insightface
+python_speech_features
 anthropic
 python-jose[cryptography]
 passlib[bcrypt]

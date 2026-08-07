@@ -57,6 +57,17 @@ class ScanResult(Base):
     scan: Mapped["Scan"] = relationship(back_populates="results")
 
 
+class Identity(Base):
+    __tablename__ = "identities"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    embedding: Mapped[list] = mapped_column(JSON)
+    det_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
