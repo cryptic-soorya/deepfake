@@ -30,6 +30,14 @@ WEIGHTS_FILENAME = "AASIST.pth"
 SAMPLE_RATE = 16000
 NUM_SAMPLES = 64600  # ~4.04s at 16kHz, per config/AASIST.conf
 
+# AASIST is trained on speech only (bonafide vs. spoofed utterances); it has
+# never seen pure silence/room-tone. Feeding it a near-silent chunk is
+# out-of-distribution input, and empirically it skews toward the spoof class
+# for such input rather than abstaining — so a quiet room reads as "cloned
+# voice" for the whole time the user isn't talking. Gate on RMS energy first
+# and skip inference entirely when there's no speech to judge.
+SILENCE_RMS_THRESHOLD = 0.01
+
 # model_config block from clovaai/aasist's config/AASIST.conf, required to
 # reconstruct the architecture the checkpoint's state dict matches.
 MODEL_CONFIG = {
@@ -77,6 +85,19 @@ class AASISTVoiceDetector(ModelWrapper):
                 "confidence": None,
                 "raw": None,
                 "metadata": {"error": "no audio samples decoded from input"},
+            }
+
+        rms = float(np.sqrt(np.mean(np.square(waveform))))
+        if rms < SILENCE_RMS_THRESHOLD:
+            return {
+                "score": None,
+                "confidence": None,
+                "raw": None,
+                "metadata": {
+                    "silence": True,
+                    "rms": rms,
+                    "interpretation": "chunk is near-silent (no speech) — skipped rather than scored as spoofed",
+                },
             }
 
         padded = _pad(waveform)

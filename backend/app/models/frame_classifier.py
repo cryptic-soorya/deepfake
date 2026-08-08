@@ -86,6 +86,14 @@ class EfficientNetB4SBI(ModelWrapper):
         crop_rgb = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB)
         crop_rgb = cv2.resize(crop_rgb, IMAGE_SIZE)
 
+        # Matches the SBI authors' own inference code exactly (src/inference/
+        # inference_video.py in mapooon/SelfBlendedImages): torch.tensor(...).
+        # float()/255, nothing else. `advprop=True` in load() only picks which
+        # ImageNet backbone from_pretrained() initializes from before the SBI
+        # checkpoint's state_dict overwrites every weight -- it does NOT mean
+        # the checkpoint was trained on [-1, 1] inputs. (A prior fix here
+        # added a (x-0.5)/0.5 step on that mistaken assumption; verified
+        # against upstream and reverted.)
         tensor = torch.from_numpy(crop_rgb.transpose(2, 0, 1)).float().unsqueeze(0) / 255.0
         tensor = tensor.to(self.device)
 
