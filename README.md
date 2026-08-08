@@ -2,7 +2,7 @@
 
 Real-time deepfake video/voice/identity detection with explainable verdicts, built for the Neurobots Championship 2026.
 
-See [`CLAUDE.md`](./CLAUDE.md) for the full architecture/tech-stack decisions and [`PLAN.md`](./PLAN.md) for the phased build order.
+
 
 ## Repo layout
 
