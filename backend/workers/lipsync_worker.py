@@ -27,6 +27,21 @@ class LipsyncWorker(StreamConsumer):
         self._model_loaded = False
         self._detector_loaded = False
 
+    async def warmup(self) -> None:
+        if not self._detector_loaded:
+            try:
+                self.detector.load()
+                self._detector_loaded = True
+            except NotImplementedError:
+                pass
+
+        if not self._model_loaded:
+            try:
+                self.model.load()
+                self._model_loaded = True
+            except NotImplementedError:
+                pass
+
     async def handle(self, message: dict) -> None:
         scan_id = message["scan_id"]
         media_key = message["media_key"]

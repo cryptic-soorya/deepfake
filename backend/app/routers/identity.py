@@ -1,4 +1,4 @@
-from functools import lru_cache
+import asyncio
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File
 from sqlalchemy import select
@@ -15,19 +15,34 @@ router = APIRouter()
 MATCH_THRESHOLD = 0.55
 LIVENESS_THRESHOLD = 0.5
 
+# Process-wide singletons, loaded at most once in a worker thread so a slow
+# first-time load (ONNX/torch init, possible checkpoint download) never blocks
+# the event loop -- mirrors app/routers/stream.py's `_ensure_models_loaded`.
+_embedder = ArcFaceEmbedder()
+_liveness = MiniFASNetLiveness()
+_embedder_loaded = False
+_liveness_loaded = False
+_load_lock = asyncio.Lock()
 
-@lru_cache
-def _get_embedder() -> ArcFaceEmbedder:
-    model = ArcFaceEmbedder()
-    model.load()
-    return model
+
+async def _get_embedder() -> ArcFaceEmbedder:
+    global _embedder_loaded
+    if not _embedder_loaded:
+        async with _load_lock:
+            if not _embedder_loaded:
+                await asyncio.to_thread(_embedder.load)
+                _embedder_loaded = True
+    return _embedder
 
 
-@lru_cache
-def _get_liveness() -> MiniFASNetLiveness:
-    model = MiniFASNetLiveness()
-    model.load()
-    return model
+async def _get_liveness() -> MiniFASNetLiveness:
+    global _liveness_loaded
+    if not _liveness_loaded:
+        async with _load_lock:
+            if not _liveness_loaded:
+                await asyncio.to_thread(_liveness.load)
+                _liveness_loaded = True
+    return _liveness
 
 
 @router.post("/enroll")
@@ -40,11 +55,11 @@ async def enroll_identity(
     image_bytes = await file.read()
 
     try:
-        embedder = _get_embedder()
+        embedder = await _get_embedder()
     except NotImplementedError:
         raise HTTPException(status_code=501, detail="face recognition model not yet integrated")
 
-    result = embedder.predict(image_bytes)
+    result = await asyncio.to_thread(embedder.predict, image_bytes)
     faces = result["raw"]["faces"]
     if not faces:
         raise HTTPException(status_code=422, detail="no face detected in enrollment image")
@@ -87,15 +102,15 @@ async def verify_identity(
         raise HTTPException(status_code=404, detail="no enrolled identity for this user_id")
 
     try:
-        embedder = _get_embedder()
-        liveness_model = _get_liveness()
+        embedder = await _get_embedder()
+        liveness_model = await _get_liveness()
     except NotImplementedError:
         raise HTTPException(status_code=501, detail="face recognition/liveness model not yet integrated")
 
-    liveness_result = liveness_model.predict(image_bytes)
+    liveness_result = await asyncio.to_thread(liveness_model.predict, image_bytes)
     is_live = liveness_result["metadata"].get("is_live", False)
 
-    embed_result = embedder.predict(image_bytes)
+    embed_result = await asyncio.to_thread(embedder.predict, image_bytes)
     probe_faces = embed_result["raw"]["faces"]
 
     match_score = 0.0

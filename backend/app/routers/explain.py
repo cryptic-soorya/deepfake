@@ -1,3 +1,4 @@
+import asyncio
 from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -38,13 +39,15 @@ async def explain_scan(scan_id: str, db: AsyncSession = Depends(get_db)):
 
     try:
         explainer = _get_explainer()
-        explanation = explainer.predict(
+        result = await asyncio.to_thread(
+            explainer.predict,
             {
                 "fused_score": scan.fused_score,
                 "fused_verdict": scan.fused_verdict,
                 "model_outputs": model_outputs,
-            }
-        )["metadata"]["narrative"]
+            },
+        )
+        explanation = result["metadata"]["narrative"]
         scan.explanation = explanation
         status = "ok"
     except (NotImplementedError, KeyError, APIError):

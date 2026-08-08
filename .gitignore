@@ -32,6 +32,9 @@ backend/app/models/weights/
 infra/minio_data/
 infra/postgres_data/
 
+# run.sh logs/pids
+.run/
+
 CLAUDE.md
 PLAN.md
 PITCHDECK.md
