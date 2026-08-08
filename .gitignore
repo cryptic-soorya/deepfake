@@ -31,3 +31,8 @@ backend/app/models/weights/
 # Docker volumes / local data
 infra/minio_data/
 infra/postgres_data/
+
+/CLAUDE.md
+/PLAN.md
+/PITCHDECK.md
+/PROGRESS.md
