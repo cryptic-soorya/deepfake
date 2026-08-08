@@ -32,7 +32,7 @@ backend/app/models/weights/
 infra/minio_data/
 infra/postgres_data/
 
-/CLAUDE.md
-/PLAN.md
-/PITCHDECK.md
-/PROGRESS.md
+CLAUDE.md
+PLAN.md
+PITCHDECK.md
+PROGRESS.md
