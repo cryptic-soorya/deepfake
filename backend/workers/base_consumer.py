@@ -15,6 +15,14 @@ class StreamConsumer:
     async def handle(self, message: dict) -> None:
         raise NotImplementedError
 
+    async def warmup(self) -> None:
+        """Load models before the consumer loop starts, not on the first
+        message. Subclasses that lazy-load model weights in `handle()`
+        should override this to do that loading up front -- otherwise the
+        cost (including any first-run weight download) lands on whichever
+        scan happens to be first through a freshly (re)spawned worker."""
+        return None
+
     async def _reclaim_stale(self, redis) -> None:
         """Claim and reprocess messages left in the PEL by a crashed/restarted
         worker. xreadgroup's '>' id only ever returns never-before-delivered
@@ -47,6 +55,7 @@ class StreamConsumer:
             if "BUSYGROUP" not in str(exc):
                 raise
 
+        await self.warmup()
         await self._reclaim_stale(redis)
 
         logger.info("worker started stream=%s group=%s", self.stream_name, self.consumer_group)

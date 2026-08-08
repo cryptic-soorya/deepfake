@@ -48,3 +48,44 @@ export async function getExplanation(scanId: string): Promise<{ explanation: str
 export function heatmapUrl(scanId: string): string {
   return `/api/v1/scan/${scanId}/heatmap`;
 }
+
+export interface EnrollResponse {
+  user_id: string;
+  enrolled: boolean;
+  det_score: number;
+}
+
+export async function enrollIdentity(userId: string, file: File): Promise<EnrollResponse> {
+  const body = new FormData();
+  body.append("user_id", userId);
+  body.append("file", file);
+  const res = await fetch("/api/v1/identity/enroll", { method: "POST", body });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.detail ?? `enrollment failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export interface VerifyResponse {
+  user_id: string;
+  verified: boolean;
+  match_score: number;
+  is_match: boolean;
+  liveness: {
+    is_live: boolean;
+    score: number;
+  };
+}
+
+export async function verifyIdentity(userId: string, file: File): Promise<VerifyResponse> {
+  const body = new FormData();
+  body.append("user_id", userId);
+  body.append("file", file);
+  const res = await fetch("/api/v1/identity/verify", { method: "POST", body });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.detail ?? `verification failed: ${res.status}`);
+  }
+  return res.json();
+}
