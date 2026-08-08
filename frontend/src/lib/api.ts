@@ -49,6 +49,10 @@ export function heatmapUrl(scanId: string): string {
   return `/api/v1/scan/${scanId}/heatmap`;
 }
 
+export function reportUrl(scanId: string): string {
+  return `/api/v1/report/${scanId}`;
+}
+
 export interface EnrollResponse {
   user_id: string;
   enrolled: boolean;

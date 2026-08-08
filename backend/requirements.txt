@@ -8,6 +8,7 @@ asyncpg
 alembic
 redis
 boto3
+reportlab
 python-multipart
 websockets
 torch

@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import CornerFrame from "../components/hud/CornerFrame";
 import StatusPill from "../components/StatusPill";
-import { getScan, getExplanation, heatmapUrl, isTerminalStatus, type ScanResponse } from "../lib/api";
+import { getScan, getExplanation, heatmapUrl, reportUrl, isTerminalStatus, type ScanResponse } from "../lib/api";
 
 const MODEL_LABELS: Record<string, string> = {
   frame_classifier: "Visual",
@@ -101,19 +101,30 @@ export default function ReportViewer() {
       >
         Scan {scanId}
       </motion.h1>
-      <motion.p
+      <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="mt-3 flex items-center gap-2 font-mono text-xs text-bone/30"
+        className="mt-3 flex flex-wrap items-center justify-between gap-4"
       >
-        {isPending && <span className="h-1.5 w-1.5 rounded-full bg-amber animate-pulseDot" />}
-        {fetchError
-          ? `Retrying — ${fetchError}`
-          : isPending
-            ? `Status: ${PENDING_LABELS[status] ?? status} — running detection pipeline… ${elapsedLabel}`
-            : `Status: ${status} — finished in ${elapsedLabel}`}
-      </motion.p>
+        <p className="flex items-center gap-2 font-mono text-xs text-bone/30">
+          {isPending && <span className="h-1.5 w-1.5 rounded-full bg-amber animate-pulseDot" />}
+          {fetchError
+            ? `Retrying — ${fetchError}`
+            : isPending
+              ? `Status: ${PENDING_LABELS[status] ?? status} — running detection pipeline… ${elapsedLabel}`
+              : `Status: ${status} — finished in ${elapsedLabel}`}
+        </p>
+        {(status === "completed" || status === "failed") && (
+          <a
+            href={reportUrl(scanId!)}
+            download={`morpheus-report-${scanId}.pdf`}
+            className="border border-amber bg-amber/10 px-4 py-2 font-mono text-xs uppercase tracking-widest text-amber transition-colors hover:bg-amber hover:text-void"
+          >
+            Download Report ↓
+          </a>
+        )}
+      </motion.div>
 
       <motion.div
         initial={{ opacity: 0, y: 16 }}
