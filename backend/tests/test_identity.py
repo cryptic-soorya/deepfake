@@ -57,8 +57,17 @@ async def client(monkeypatch):
 
     app.dependency_overrides[get_db] = _get_db
 
-    monkeypatch.setattr("app.routers.identity._get_embedder", lambda: FakeEmbedder(EMBEDDING_A))
-    monkeypatch.setattr("app.routers.identity._get_liveness", lambda: FakeLiveness(is_live=True))
+    fake_embedder = FakeEmbedder(EMBEDDING_A)
+    fake_liveness = FakeLiveness(is_live=True)
+
+    async def _get_embedder():
+        return fake_embedder
+
+    async def _get_liveness():
+        return fake_liveness
+
+    monkeypatch.setattr("app.routers.identity._get_embedder", _get_embedder)
+    monkeypatch.setattr("app.routers.identity._get_liveness", _get_liveness)
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

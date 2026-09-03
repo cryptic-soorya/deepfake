@@ -26,8 +26,11 @@ const VERDICT_SMOOTHING_WINDOW = 10;
 // with equal weight forever, so a rough start could keep reading "fake"
 // long after the feed had settled. Video and audio are windowed separately
 // (see SESSION_WINDOW_AUDIO) because they arrive at very different rates.
-const SESSION_WINDOW_VIDEO = 60; // 30s at ~2fps
-// Audio chunks are ~4s each, so 8 of them span roughly the same 30s as the
+// Halved from 60->30 (30s->15s) -- 30s was long enough that a settled,
+// genuinely-authentic feed still took half a minute to fully flush early
+// rough samples out of the average.
+const SESSION_WINDOW_VIDEO = 30; // 15s at ~2fps
+// Audio chunks are ~4s each, so this spans roughly the same ~15-20s as the
 // video window above. Previously both modalities were pooled into one
 // SESSION_WINDOW-sized array; since video arrives 8x more often than audio,
 // that pool was ~90% video by sample count, so "Overall Certainty" was
@@ -36,13 +39,19 @@ const SESSION_WINDOW_VIDEO = 60; // 30s at ~2fps
 // though the individual channel readouts were both correct. Weighting each
 // modality's own mean (see combinedCertainty) instead of pooling raw samples
 // fixes that.
-const SESSION_WINDOW_AUDIO = 8;
+const SESSION_WINDOW_AUDIO = 5;
 // Mirrors app/fusion/scoring.py's _MODEL_WEIGHTS for frame_classifier/
 // audio_deepfake (lipsync isn't wired into the live path). Renormalized over
 // whichever modality actually has samples, same as that module does.
 const MODALITY_WEIGHTS = { video: 0.45, audio: 0.3 };
-const FRAME_WIDTH = 480;
-const FRAME_HEIGHT = 360;
+// Raised from 480x360 @ q0.7 -- at that size the face crop the video model
+// actually scores (a sub-region of this, then upscaled to 380x380 for
+// EfficientNet-B4) was soft enough that JPEG/upscale artifacts near the face
+// boundary could read as the blending artifacts SBI was trained to flag,
+// biasing genuine footage away from a clean low score.
+const FRAME_WIDTH = 640;
+const FRAME_HEIGHT = 480;
+const FRAME_JPEG_QUALITY = 0.85;
 
 // Matches app/routers/stream.py's TAG_VIDEO / TAG_AUDIO — a 1-byte modality
 // tag prefixed onto every binary WS message so one socket carries both streams.
@@ -237,7 +246,7 @@ export default function LiveSession() {
             }
           },
           "image/jpeg",
-          0.7,
+          FRAME_JPEG_QUALITY,
         );
       }, SAMPLE_INTERVAL_MS);
 

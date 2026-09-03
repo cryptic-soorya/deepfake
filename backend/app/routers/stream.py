@@ -89,6 +89,13 @@ async def stream_session(websocket: WebSocket, session_id: str):
             except WebSocketDisconnect:
                 raise
             except Exception:
+                # Starlette only raises WebSocketDisconnect on the first disconnect
+                # message; once client_state is already DISCONNECTED, further
+                # receive_bytes() calls raise a plain RuntimeError instead. Without
+                # this check that fell into a tight infinite loop (no yield/backoff),
+                # pegging the event loop at 100% CPU and starving every other session.
+                if websocket.client_state == WebSocketState.DISCONNECTED:
+                    raise WebSocketDisconnect()
                 logger.exception("failed to receive a message on session %s; waiting for the next one", session_id)
                 continue
 
